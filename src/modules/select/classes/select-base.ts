@@ -3,7 +3,7 @@ import {
     AfterContentInit, TemplateRef, ViewContainerRef, ContentChild, EventEmitter, Output, OnDestroy
 } from "@angular/core";
 import { Subscription } from "rxjs/Subscription";
-import { DropdownService, SuiDropdownMenu } from "../../dropdown/index";
+import { DropdownService, SuiDropdownMenu, DropdownOpenTrigger } from "../../dropdown/index";
 import { SearchService, LookupFn, FilterFn } from "../../search/index";
 import { Util, ITemplateRefContext, HandledEvent, KeyCode, IFocusEvent } from "../../../misc/util/index";
 import { ISelectLocaleValues, RecursivePartial, SuiLocalizationService } from "../../../behaviors/localization/index";
@@ -44,6 +44,15 @@ export abstract class SuiSelectBase<T, U> implements AfterContentInit, OnDestroy
     public get isVisible():boolean {
         return this._menu.isVisible;
     }
+
+    private _openingTimeout:any;
+    private _closingTimeout:any;
+
+    @Input()
+    public hoverOpenDelay:number;
+
+    @Input()
+    public hoverCloseDelay:number;
 
     @Input()
     public isSearchable:boolean;
@@ -222,6 +231,12 @@ export abstract class SuiSelectBase<T, U> implements AfterContentInit, OnDestroy
     @Input()
     public transitionDuration:number;
 
+    @Input()
+    public openTrigger:string;
+
+    @Input()
+    public closeTriggers:string | string[];
+
     @Output("touched")
     public onTouched:EventEmitter<void>;
 
@@ -240,9 +255,14 @@ export abstract class SuiSelectBase<T, U> implements AfterContentInit, OnDestroy
         this.transition = "slide down";
         this.transitionDuration = 200;
 
+        this.hoverOpenDelay = 100;
+        this.hoverCloseDelay = 500;
+
         this.onTouched = new EventEmitter<void>();
 
         this._selectClasses = true;
+        this.openTrigger = DropdownOpenTrigger.Click;
+        // this.closeTriggers = [SelectTrigger.]
     }
 
     public ngAfterContentInit():void {
@@ -346,7 +366,7 @@ export abstract class SuiSelectBase<T, U> implements AfterContentInit, OnDestroy
 
     @HostListener("click", ["$event"])
     public onClick(e:HandledEvent):void {
-        if (!e.eventHandled && !this.dropdownService.isAnimating) {
+        if (this.openTrigger === DropdownOpenTrigger.Click && !e.eventHandled && !this.dropdownService.isAnimating) {
             e.eventHandled = true;
 
             // If the dropdown is searchable, clicking should keep it open, otherwise we toggle the open state.
@@ -371,6 +391,47 @@ export abstract class SuiSelectBase<T, U> implements AfterContentInit, OnDestroy
         if (!this._element.nativeElement.contains(e.relatedTarget)) {
             this.dropdownService.setOpenState(false);
             this.onTouched.emit();
+        }
+    }
+
+    @HostListener("mouseenter")
+    private onMouseEnter():void {
+        if (this.openTrigger === DropdownOpenTrigger.Hover) {
+            // Cancel any pending open and close
+            clearTimeout(this._openingTimeout);
+            clearTimeout(this._closingTimeout);
+
+            if (!this.dropdownService.isOpen && !this.dropdownService.isAnimating) {
+                // Start opening after the specified delay interval.
+                this._openingTimeout = setTimeout(
+                    () => {
+                        this.dropdownService.setOpenState(true);
+                        this.focus();
+                    },
+                    this.hoverOpenDelay
+                );
+            }
+        }
+    }
+
+    @HostListener("mouseleave")
+    private onMouseLeave():void {
+        if (this.openTrigger === DropdownOpenTrigger.Hover) {
+            // Cancel any pending open and close
+            clearTimeout(this._closingTimeout);
+            clearTimeout(this._openingTimeout);
+
+            if (this.dropdownService.isOpen || this.dropdownService.isAnimating) {
+                // Start closing after the specified delay interval.
+                this._closingTimeout = setTimeout(
+                    () => {
+                        if (this.dropdownService.isOpen) {
+                            this.dropdownService.setOpenState(false);
+                        }
+                    },
+                    this.hoverCloseDelay
+                );
+            }
         }
     }
 
