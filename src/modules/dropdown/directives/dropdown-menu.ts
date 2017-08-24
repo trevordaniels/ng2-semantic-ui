@@ -2,9 +2,9 @@ import {
     Directive, ContentChild, forwardRef, Renderer2, ElementRef, AfterContentInit,
     ContentChildren, QueryList, Input, HostListener, ChangeDetectorRef
 } from "@angular/core";
-import { Transition, SuiTransition, TransitionController, TransitionDirection } from "../../transition";
-import { HandledEvent, IAugmentedElement, KeyCode } from "../../../misc/util";
-import { DropdownService, DropdownAutoCloseType } from "../services/dropdown.service";
+import { Transition, SuiTransition, TransitionController, TransitionDirection } from "../../transition/index";
+import { HandledEvent, IAugmentedElement, KeyCode } from "../../../misc/util/index";
+import { DropdownService } from "../services/dropdown.service";
 // Polyfill for IE
 import "element-closest";
 
@@ -143,19 +143,13 @@ export class SuiDropdownMenu extends SuiTransition implements AfterContentInit {
         this.menuSelectedItemClass = "selected";
     }
 
-    @HostListener("click", ["$event"])
-    public onClick(e:HandledEvent & MouseEvent):void {
-        if (!e.eventHandled) {
-            e.eventHandled = true;
-
-            if (this._service.autoCloseMode === DropdownAutoCloseType.ItemClick) {
-                const target = e.target as IAugmentedElement;
-                if (this.element.nativeElement.contains(target.closest(".item")) && !/input|textarea/i.test(target.tagName)) {
-                    // Once an item is selected, we can close the entire dropdown.
-                    this._service.setOpenState(false, true);
-                }
-            }
+    @HostListener("click",["$event"])
+    public onClick(e: HandledEvent & MouseEvent): void {
+        const target = e.target as IAugmentedElement;
+        if (this.element.nativeElement.contains(target.closest(".item")) && !/input|textarea/i.test(target.tagName)) {
+            this.service.handleItemClick(e);
         }
+        e.eventHandled = true; //prevent disabled item click propagating
     }
 
     @HostListener("document:keydown", ["$event"])
